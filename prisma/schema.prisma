@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  sessionKey  String   @id @map("session_key") @db.VarChar(40)
+  sessionData String   @map("session_data")
+  expireDate  DateTime @map("expire_date") @db.Timestamptz
+
+  @@index([expireDate])
+  @@map("session")
+}
+
+model User {
+  id          BigInt    @id @default(autoincrement())
+  password    String    @db.VarChar(128)
+  lastLogin   DateTime? @map("last_login") @db.Timestamptz
+  isSuperuser Boolean   @map("is_superuser")
+  username    String    @unique @db.VarChar(150)
+  firstName   String    @map("first_name") @db.VarChar(150)
+  lastName    String    @map("last_name") @db.VarChar(150)
+  isStaff     Boolean   @map("is_staff")
+  isActive    Boolean   @map("is_active")
+  dateJoined  DateTime  @map("date_joined") @db.Timestamptz
+  email       String    @unique @db.VarChar(254)
+
+  profile            Profile?
+  roomMembers        ChatRoomMember[]
+  messages           Message[]
+  readStatuses       MessageReadStatus[]
+  passwordResetCodes PasswordResetCode[]
+  refreshTokens      RefreshToken[]
+
+  @@map("users_user")
+}
+
+model RefreshToken {
+  id BigInt @id @default(autoincrement())
+
+  token String @unique
+
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  revoked Boolean @default(false)
+
+  userId BigInt @map("user_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetCode {
+  id BigInt @id @default(autoincrement())
+
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  used      Boolean  @default(false)
+
+  attempts Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_codes")
+}
+
+model Profile {
+  id       BigInt    @id @default(autoincrement())
+  avatar   String?   @db.VarChar(100)
+  status   String    @db.VarChar(10)
+  lastSeen DateTime? @map("last_seen") @db.Timestamptz
+
+  userId BigInt @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("users_profile")
+}
+
+model ChatRoom {
+  id   BigInt  @id @default(autoincrement())
+  name String? @db.VarChar(255)
+
+  isGroup Boolean @map("is_group")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  members  ChatRoomMember[]
+  messages Message[]
+
+  @@map("chat_room")
+}
+
+model ChatRoomMember {
+  id BigInt @id @default(autoincrement())
+
+  role String @db.VarChar(10)
+
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz
+
+  roomId BigInt @map("room_id")
+  userId BigInt @map("user_id")
+
+  room ChatRoom @relation(fields: [roomId], references: [id])
+  user User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, roomId])
+  @@index([roomId])
+  @@index([userId])
+  @@map("chat_roommember")
+}
+
+model Message {
+  id BigInt @id @default(autoincrement())
+
+  content String
+
+  file String? @db.VarChar(100)
+
+  timestamp DateTime @default(now()) @db.Timestamptz
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  isEdited Boolean @default(false) @map("is_edited")
+
+  roomId   BigInt @map("room_id")
+  senderId BigInt @map("sender_id")
+
+  room ChatRoom @relation(fields: [roomId], references: [id])
+
+  sender User @relation(fields: [senderId], references: [id])
+
+  readStatuses MessageReadStatus[]
+
+  @@index([roomId])
+  @@index([senderId])
+  @@map("messaging_message")
+}
+
+model MessageReadStatus {
+  id BigInt @id @default(autoincrement())
+
+  readAt DateTime @default(now()) @map("read_at") @db.Timestamptz
+
+  messageId BigInt @map("message_id")
+  userId    BigInt @map("user_id")
+
+  message Message @relation(fields: [messageId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("messaging_messagereadstatus")
+}
